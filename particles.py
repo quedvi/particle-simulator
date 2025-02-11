@@ -5,11 +5,11 @@ from pygame.constants import QUIT
 from time import sleep
 
 
-screen_b = screen_h = 750
+screen_b = screen_h = 1000
 dt = 1
 
-particles_count = 3000
-kind = 6
+particles_count = 2000
+kind = 5
 
 kind_color = [
     (255, 0, 0), 
@@ -21,20 +21,53 @@ kind_color = [
 ]
 
 # interaction_matrix = np.zeros((kind, kind))
+# interaction_matrix = [
+#     [ +3,  -2, -3,  -1, +3, +5],
+#     [ +2,  -1, -3,  -1, +3, +5],
+#     [ -3,  -3, -1,  +1, +3, +5],
+#     [ -1,  -1, -1,  -1, +3, +5],
+#     [ -5,  +5, -5,  +5, +3, +5],
+#     [ -5,  -5, +5,  +5, -5, +5]
+# ] * 2
+s = -5
+a = 2
+b = -2
+z = 0
+# interaction_matrix = [
+#     [ a, a, b, s,  z, z],
+#     [ b, a, a, s,  z, z],
+#     [ a, b, a, s,  z, z],
+#     [ s, s, s, s,  z, z],
+#     [ z, z, z, z,  a, z],
+#     [ z, z, z, z,  z, a]
+# ] * 3
+
+
+a = 2
+b = -2
 interaction_matrix = [
-    [+10, -5,  -5, +10, +3, +5],
-    [ +5, +10, +5, +10, +3, +5],
-    [ +5,  +5, -5, +10, +3, +5],
-    [ +5,  +5, +5,  -5, +3, +5],
-    [ -5,  +5, -5,  +5, +3, +5],
-    [ -5,  -5, +5,  +5, -5, +5]
-]
+    [ a, b, 0, 0,  s, z],
+    [ 0, a, b, 0,  s, z],
+    [ 0, 0, a, b,  s, z],
+    [ 0, 0, 0, a,  s, z],
+    [ s, s, s, s,  s, z],
+    [ z, z, z, z,  z, a]
+] * 3
+
+
+# interaction_matrix = [
+#     [ a, a, s, s,  z, z],
+#     [ b, a, s, s,  z, z],
+#     [ s, s, s, s,  z, z],
+#     [ s, s, s, s,  z, z],
+#     [ z, z, z, z,  a, z],
+#     [ z, z, z, z,  z, a]
+# ] * 3
 
 
 particle_radius = 3
 
-interaction_radius = 30
-
+interaction_radius = 70 #30
 draw_interactions = False
 interaction_line_width = 3
 
@@ -50,24 +83,33 @@ def draw_particles(screen, particles, kinds):
 
 
 def get_force(distance : float, kind_i : int, kind_j : int):
-    repulsion_radius = 5
-    repulsion_strength = -5
-    attraction_max_radius = 20
-    attraction_radius = 30
     attraction_max = interaction_matrix[kind_i][kind_j]
+    return min(attraction_max/distance * 10, 20)
     
-    if distance < repulsion_radius:
-        return distance * repulsion_strength/repulsion_radius - repulsion_strength
-    if distance < attraction_max_radius:
-        return (distance - repulsion_radius) * attraction_max/(attraction_max_radius - repulsion_radius)
-    if distance < attraction_radius:
-        return (attraction_radius - distance) * attraction_max/(attraction_radius - attraction_max_radius)
-    return 0
+    
+    # repulsion_radius = 5
+    # repulsion_strength = -5
+    # attraction_max_radius = 20
+    # attraction_radius = 30
+    # attraction_max = interaction_matrix[kind_i][kind_j]
+    
+    # if distance < repulsion_radius:
+    #     return distance * repulsion_strength/repulsion_radius - repulsion_strength
+    # if distance < attraction_max_radius:
+    #     return (distance - repulsion_radius) * attraction_max/(attraction_max_radius - repulsion_radius)
+    # if distance < attraction_radius:
+    #     return (attraction_radius - distance) * attraction_max/(attraction_radius - attraction_max_radius)
+    # return 0
 
 
 def interaction(particles : np.ndarray, kinds : np.ndarray, i : int, j : int):      
     distance = np.linalg.norm(particles[i] - particles[j])
-    a = get_force(distance, kinds[i], kinds[j])
+    
+    if distance < 10: #(repulsion)
+        a = -10.0
+    else:
+        a = get_force(distance, kinds[i], kinds[j])
+        
     direction = particles[j] - particles[i]
     direction /= np.linalg.norm(direction)
     return a * direction
@@ -87,22 +129,31 @@ def main():
     
     velocities = np.zeros((particles_count, 2))
     kinds = np.random.randint(0, kind, particles_count)
-    
+      
     while True:
         screen.fill((0, 0, 0))
-        next_particles = particles.copy()
         
         kd_tree = spatial.KDTree(particles)
-        interactions = kd_tree.query_pairs(interaction_radius)
-        for i, j in interactions:
-            velocities[i] += interaction(particles, kinds, i, j) * 0.1
-            velocities[j] += interaction(particles, kinds, j, i) * 0.1
+        # interactions = kd_tree.query_pairs(interaction_radius)
+        interactions = kd_tree.query_ball_point(particles, interaction_radius, workers=-1) # increase workers
+        for i in range(particles_count):
+            for j in interactions[i]:
+                if i == j:
+                    continue
+                velocities[i] += interaction(particles, kinds, i, j) * 0.15
+            # velocities[i] += interaction(particles, kinds, i, j) * 0.033
+            # velocities[j] += interaction(particles, kinds, j, i) * 0.033
                 
-        velocities *= 0.9 # friction
-        next_particles += velocities
-        next_particles %= np.array([screen_b, screen_h])
+        velocities *= 0.75 # friction
+        particles += velocities
         
-        particles = next_particles
+        for i in range(particles_count):
+            if particles[i][0] < 0 or particles[i][0] >= screen_b:
+                velocities[i][0] = -velocities[i][0]
+            if particles[i][1] < 0 or particles[i][1] >= screen_h:
+                velocities[i][1] = -velocities[i][1]
+                
+        # particles %= np.array([screen_b, screen_h])
         
         draw_particles(screen, particles, kinds)
         if draw_interactions:
