@@ -44,15 +44,15 @@ z = 0
 
 
 a = 2
-b = -2
+b = 1
 interaction_matrix = [
     [ a, b, 0, 0,  s, z],
     [ 0, a, b, 0,  s, z],
     [ 0, 0, a, b,  s, z],
-    [ 0, 0, 0, a,  s, z],
+    [ b, 0, 0, a,  s, z],
     [ s, s, s, s,  s, z],
     [ z, z, z, z,  z, a]
-] * 3
+] * 5
 
 
 # interaction_matrix = [
@@ -68,6 +68,9 @@ interaction_matrix = [
 particle_radius = 3
 
 interaction_radius = 70 #30
+dt = 0.2
+friction = 0.75
+
 draw_interactions = False
 interaction_line_width = 3
 
@@ -140,11 +143,11 @@ def main():
             for j in interactions[i]:
                 if i == j:
                     continue
-                velocities[i] += interaction(particles, kinds, i, j) * 0.15
+                velocities[i] += interaction(particles, kinds, i, j) * dt
             # velocities[i] += interaction(particles, kinds, i, j) * 0.033
             # velocities[j] += interaction(particles, kinds, j, i) * 0.033
                 
-        velocities *= 0.75 # friction
+        velocities *= friction
         particles += velocities
         
         for i in range(particles_count):
